@@ -1,0 +1,83 @@
+# ============================================
+# Deployment for Incident Ingest Service
+# ============================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: incident-ingest-service
+  namespace: smart-incident
+  labels:
+    app: incident-ingest-service
+    app.kubernetes.io/name: incident-ingest-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: smart-incident-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: incident-ingest-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: incident-ingest-service
+        version: v1
+    spec:
+      containers:
+        - name: incident-ingest-service
+          # For Minikube: use local image
+          # Run: eval $(minikube docker-env) && docker build -t incident-ingest-service:latest .
+          image: incident-ingest-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+
+          # Environment from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: incident-ingest-config
+
+          # Resource limits
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+          # Probes
+          livenessProbe:
+            httpGet:
+              path: /api/incidents/health
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /api/incidents/health
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          # Security context
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+
+      # Pod-level settings
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30

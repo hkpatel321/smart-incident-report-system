@@ -1,0 +1,25 @@
+# ============================================
+# ConfigMap for Incident Ingest Service
+# ============================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: incident-ingest-config
+  namespace: smart-incident
+  labels:
+    app: incident-ingest-service
+    app.kubernetes.io/name: incident-ingest-service
+    app.kubernetes.io/component: config
+data:
+  # Server Configuration
+  SERVER_PORT: "8081"
+
+  # Kafka Configuration
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka-service.smart-incident.svc.cluster.local:9092"
+
+  # Logging
+  LOGGING_LEVEL_ROOT: "INFO"
+  LOGGING_LEVEL_COM_SMARTINCIDENT: "DEBUG"
+
+  # Application Settings
+  SPRING_APPLICATION_NAME: "incident-ingest-service"

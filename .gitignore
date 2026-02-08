@@ -1,0 +1,62 @@
+# ======================
+# Build & Dependencies
+# ======================
+target/
+bin/
+*.jar
+*.war
+*.class
+!.mvn/wrapper/maven-wrapper.jar
+
+# Node.js
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.npm
+
+# ======================
+# IDE
+# ======================
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+*.swp
+*.swo
+.project
+.classpath
+.settings/
+
+# ======================
+# Logs & Temp Files
+# ======================
+logs/
+*.log
+*.tmp
+*.bak
+hs_err_pid*
+
+# ======================
+# Environment & Secrets
+# ======================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ======================
+# OS Generated
+# ======================
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# ======================
+# Docker (local volumes)
+# ======================
+postgres_data/
+docker-compose.override.yml

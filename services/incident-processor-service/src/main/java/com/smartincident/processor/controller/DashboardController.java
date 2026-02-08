@@ -1,0 +1,175 @@
+package com.smartincident.processor.controller;
+
+import com.smartincident.processor.dto.IncidentDetailDto;
+import com.smartincident.processor.dto.IncidentSummaryDto;
+import com.smartincident.processor.dto.PagedResponse;
+import com.smartincident.processor.entity.Incident;
+import com.smartincident.processor.entity.Severity;
+import com.smartincident.processor.entity.Status;
+import com.smartincident.processor.repository.IncidentRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * REST Controller for dashboard incident views.
+ * Provides paginated, filterable incident data.
+ */
+@RestController
+@RequestMapping("/api/dashboard/incidents")
+@RequiredArgsConstructor
+@Slf4j
+public class DashboardController {
+
+    private final IncidentRepository incidentRepository;
+
+    private static final int DEFAULT_PAGE_SIZE = 10;
+    private static final int MAX_PAGE_SIZE = 100;
+
+    /**
+     * Get paginated list of incidents with optional filters.
+     *
+     * @param page     Page number (0-based)
+     * @param size     Page size (default 10, max 100)
+     * @param severity Filter by severity (optional)
+     * @param status   Filter by status (optional)
+     * @param search   Search term for title (optional)
+     * @param sortBy   Sort field (default: createdAt)
+     * @param sortDir  Sort direction: asc/desc (default: desc)
+     */
+    @GetMapping
+    public ResponseEntity<PagedResponse<IncidentSummaryDto>> getIncidents(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Severity severity,
+            @RequestParam(required = false) Status status,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+
+        // Validate page size
+        size = Math.min(size, MAX_PAGE_SIZE);
+        if (size < 1)
+            size = DEFAULT_PAGE_SIZE;
+
+        // Build sort
+        Sort sort = sortDir.equalsIgnoreCase("asc")
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        // Execute query
+        Page<Incident> incidentPage;
+        if (search != null && !search.isBlank()) {
+            incidentPage = incidentRepository.searchIncidents(status, severity, search.trim(), pageable);
+        } else {
+            incidentPage = incidentRepository.findWithFilters(status, severity, pageable);
+        }
+
+        // Convert to DTOs
+        List<IncidentSummaryDto> dtos = incidentPage.getContent().stream()
+                .map(IncidentSummaryDto::fromEntity)
+                .toList();
+
+        log.debug("Fetched {} incidents (page {}/{})",
+                dtos.size(), page + 1, incidentPage.getTotalPages());
+
+        return ResponseEntity.ok(PagedResponse.of(
+                dtos,
+                page,
+                size,
+                incidentPage.getTotalElements()));
+    }
+
+    /**
+     * Get single incident by ID.
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<IncidentDetailDto> getIncidentById(@PathVariable String id) {
+        return incidentRepository.findById(id)
+                .map(IncidentDetailDto::fromEntity)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Get critical incidents (high priority view).
+     */
+    @GetMapping("/critical")
+    public ResponseEntity<PagedResponse<IncidentSummaryDto>> getCriticalIncidents(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        size = Math.min(size, MAX_PAGE_SIZE);
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<Incident> incidentPage = incidentRepository.findCriticalIncidents(pageable);
+
+        List<IncidentSummaryDto> dtos = incidentPage.getContent().stream()
+                .map(IncidentSummaryDto::fromEntity)
+                .toList();
+
+        return ResponseEntity.ok(PagedResponse.of(
+                dtos,
+                page,
+                size,
+                incidentPage.getTotalElements()));
+    }
+
+    /**
+     * Get incidents by status (quick filter).
+     */
+    @GetMapping("/status/{status}")
+    public ResponseEntity<PagedResponse<IncidentSummaryDto>> getByStatus(
+            @PathVariable Status status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        size = Math.min(size, MAX_PAGE_SIZE);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+
+        Page<Incident> incidentPage = incidentRepository.findByStatus(status, pageable);
+
+        List<IncidentSummaryDto> dtos = incidentPage.getContent().stream()
+                .map(IncidentSummaryDto::fromEntity)
+                .toList();
+
+        return ResponseEntity.ok(PagedResponse.of(
+                dtos,
+                page,
+                size,
+                incidentPage.getTotalElements()));
+    }
+
+    /**
+     * Get incidents by severity (quick filter).
+     */
+    @GetMapping("/severity/{severity}")
+    public ResponseEntity<PagedResponse<IncidentSummaryDto>> getBySeverity(
+            @PathVariable Severity severity,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        size = Math.min(size, MAX_PAGE_SIZE);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+
+        Page<Incident> incidentPage = incidentRepository.findByClassifiedSeverity(severity, pageable);
+
+        List<IncidentSummaryDto> dtos = incidentPage.getContent().stream()
+                .map(IncidentSummaryDto::fromEntity)
+                .toList();
+
+        return ResponseEntity.ok(PagedResponse.of(
+                dtos,
+                page,
+                size,
+                incidentPage.getTotalElements()));
+    }
+}

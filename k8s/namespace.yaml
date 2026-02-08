@@ -1,0 +1,10 @@
+# ============================================
+# Namespace for Smart Incident System
+# ============================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: smart-incident
+  labels:
+    app.kubernetes.io/name: smart-incident-system
+    app.kubernetes.io/component: namespace
