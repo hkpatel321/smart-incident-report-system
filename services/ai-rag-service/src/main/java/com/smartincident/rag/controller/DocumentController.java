@@ -45,15 +45,21 @@ public class DocumentController {
                 .docType(request.getDocType())
                 .sourceId(request.getSourceId())
                 .tags(request.getTags())
-                .embedding(embedding)
+                .embedding(GeminiClient.embeddingToString(embedding))
                 .build();
 
-        KnowledgeDocument saved = documentRepository.save(doc);
-        log.info("Document ingested with ID: {}", saved.getId());
+        Long savedId = documentRepository.saveNative(
+                doc.getTitle(),
+                doc.getContent(),
+                doc.getDocType(),
+                doc.getSourceId(),
+                doc.getTags(),
+                doc.getEmbedding());
+        log.info("Document ingested with ID: {}", savedId);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "id", saved.getId(),
-                "title", saved.getTitle(),
+                "id", savedId,
+                "title", doc.getTitle(),
                 "message", "Document ingested successfully"));
     }
 

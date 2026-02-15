@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Clock, AlertCircle, CheckCircle, Sparkles, Loader2 } from 'lucide-react'
+import { ArrowLeft, Clock, AlertCircle, CheckCircle, CheckCircle2, Sparkles, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { incidentApi } from '../services/api'
 import { SeverityBadge, StatusBadge } from '../components/Badge'
@@ -24,6 +24,7 @@ function IncidentDetail() {
   // AI Suggestion state
   const [aiSuggestion, setAiSuggestion] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
+  const [resolving, setResolving] = useState(false)
 
   useEffect(() => {
     fetchIncident()
@@ -55,6 +56,20 @@ function IncidentDetail() {
       console.error('Failed to get AI suggestion:', err)
     } finally {
       setAiLoading(false)
+    }
+  }
+
+  const handleResolve = async () => {
+    if (!incident) return
+    setResolving(true)
+    try {
+      const aiRec = aiSuggestion ? aiSuggestion.rootCause : null
+      await incidentApi.resolveIncident(incident.id, aiRec)
+      await fetchIncident() // Refresh to show updated status + timeline
+    } catch (err) {
+      console.error('Failed to resolve incident:', err)
+    } finally {
+      setResolving(false)
     }
   }
 
@@ -101,6 +116,25 @@ function IncidentDetail() {
           <div className="flex items-center gap-3">
             <SeverityBadge severity={incident.severity} />
             <StatusBadge status={incident.status} />
+            {incident.status !== 'RESOLVED' && (
+              <button
+                onClick={handleResolve}
+                disabled={resolving}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm"
+              >
+                {resolving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Resolving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Resolve Incident
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 

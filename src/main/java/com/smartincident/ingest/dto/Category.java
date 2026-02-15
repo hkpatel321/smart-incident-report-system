@@ -8,5 +8,7 @@ public enum Category {
     INFRASTRUCTURE,
     APPLICATION,
     NETWORK,
+    DATABASE,
+    PERFORMANCE,
     OTHER
 }

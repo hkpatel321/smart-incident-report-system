@@ -147,3 +147,8 @@ export const severityLevels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
  * Status options
  */
 export const statusOptions = ['NEW', 'PROCESSING', 'ASSIGNED', 'RESOLVED', 'CLOSED']
+
+/**
+ * Source options for incidents
+ */
+export const sourceOptions = ['MANUAL', 'PROMETHEUS', 'DATADOG', 'CLOUDWATCH', 'KUBERNETES', 'NAGIOS', 'CUSTOM']

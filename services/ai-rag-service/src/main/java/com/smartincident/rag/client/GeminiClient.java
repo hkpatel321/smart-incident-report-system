@@ -30,8 +30,11 @@ public class GeminiClient {
     @Value("${gemini.api.base-url:https://generativelanguage.googleapis.com/v1beta}")
     private String baseUrl;
 
-    @Value("${gemini.model.embedding:models/text-embedding-004}")
+    @Value("${gemini.model.embedding:models/gemini-embedding-001}")
     private String embeddingModel;
+
+    @Value("${gemini.model.embedding.dimensions:768}")
+    private int embeddingDimensions;
 
     @Value("${gemini.model.generation:models/gemini-1.5-flash}")
     private String generationModel;
@@ -64,6 +67,7 @@ public class GeminiClient {
 
             JsonObject requestBody = new JsonObject();
             requestBody.add("content", content);
+            requestBody.addProperty("outputDimensionality", embeddingDimensions);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))

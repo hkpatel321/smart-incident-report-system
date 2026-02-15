@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Send, CheckCircle, AlertCircle } from 'lucide-react'
 import { incidentApi } from '../services/api'
-import { serviceOptions, categoryOptions } from '../data/mockData'
+import { serviceOptions, categoryOptions, sourceOptions } from '../data/mockData'
+
+const severityLevels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
 
 /**
  * Create/Simulate Incident Page
@@ -16,6 +18,8 @@ function CreateIncident() {
     description: '',
     serviceName: '',
     category: '',
+    severity: '',
+    source: 'MANUAL',
     reporterEmail: '',
   })
   
@@ -45,6 +49,8 @@ function CreateIncident() {
         description: '',
         serviceName: '',
         category: '',
+        severity: '',
+        source: 'MANUAL',
         reporterEmail: '',
       })
     } catch (err) {
@@ -147,6 +153,44 @@ function CreateIncident() {
               <option value="">Select type</option>
               {categoryOptions.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Severity */}
+          <div>
+            <label htmlFor="severity" className="block text-sm font-medium text-gray-700 mb-1">
+              Severity Level *
+            </label>
+            <select
+              id="severity"
+              name="severity"
+              value={formData.severity}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            >
+              <option value="">Select severity</option>
+              {severityLevels.map(sev => (
+                <option key={sev} value={sev}>{sev}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Source */}
+          <div>
+            <label htmlFor="source" className="block text-sm font-medium text-gray-700 mb-1">
+              Source
+            </label>
+            <select
+              id="source"
+              name="source"
+              value={formData.source}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            >
+              {sourceOptions.map(src => (
+                <option key={src} value={src}>{src}</option>
               ))}
             </select>
           </div>

@@ -37,11 +37,11 @@ public class KnowledgeDocument {
     private String tags; // comma-separated tags
 
     /**
-     * Vector embedding (768 dimensions for Gemini text-embedding-004).
-     * Stored as float[] for pgvector.
+     * Vector embedding (768 dimensions).
+     * Stored as String (casted to vector by DB) to avoid Hibernate mapping issues.
      */
     @Column(name = "embedding", columnDefinition = "vector(768)")
-    private float[] embedding;
+    private String embedding;
 
     @Column(name = "created_at")
     private Instant createdAt;

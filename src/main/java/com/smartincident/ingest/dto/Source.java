@@ -8,5 +8,11 @@ public enum Source {
     API,
     IOT_SENSOR,
     EMAIL,
-    MANUAL
+    MANUAL,
+    PROMETHEUS,
+    DATADOG,
+    CLOUDWATCH,
+    KUBERNETES,
+    NAGIOS,
+    CUSTOM
 }

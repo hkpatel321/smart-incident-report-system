@@ -132,7 +132,19 @@ export const incidentApi = {
       description: incident.description,
       category: incident.category,
       severity: incident.severity,
+    }, {
+      timeout: 60000, // 60s — Gemini API calls can take longer than the default 10s
     })
+    return response.data
+  },
+
+  /**
+   * Resolve an incident
+   * Endpoint: PATCH /api/dashboard/incidents/:id/resolve
+   */
+  async resolveIncident(id, aiRecommendation = null) {
+    const body = aiRecommendation ? { aiRecommendation } : {}
+    const response = await api.patch(`/api/dashboard/incidents/${id}/resolve`, body)
     return response.data
   },
 }

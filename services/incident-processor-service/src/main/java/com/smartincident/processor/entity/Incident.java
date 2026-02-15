@@ -57,6 +57,9 @@ public class Incident {
     @Column(name = "ai_recommendation", columnDefinition = "TEXT")
     private String aiRecommendation;
 
+    @Column(name = "logs", columnDefinition = "TEXT")
+    private String logs;
+
     @Column(name = "classification_confidence")
     private Double classificationConfidence;
 

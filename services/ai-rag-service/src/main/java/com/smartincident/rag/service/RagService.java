@@ -85,37 +85,38 @@ public class RagService {
     }
 
     private String buildPrompt(ResolutionRequest request, String context) {
-        return String.format("""
-                You are an expert incident response analyst. Based on the following context
-                from our knowledge base, provide a detailed resolution recommendation.
+        return String.format(
+                """
+                        You are an expert incident response analyst. Based on the following context
+                        from our knowledge base, provide a detailed resolution recommendation.
 
-                CONTEXT FROM KNOWLEDGE BASE:
-                %s
+                        If the context is not relevant to the incident, use your general knowledge but mention that the context was insufficient.
 
-                INCIDENT DETAILS:
-                - ID: %s
-                - Title: %s
-                - Description: %s
-                - Category: %s
-                - Severity: %s
+                        CONTEXT FROM KNOWLEDGE BASE:
+                        %s
 
-                Please provide your response in the following format:
+                        INCIDENT DETAILS:
+                        - ID: %s
+                        - Title: %s
+                        - Description: %s
+                        - Category: %s
+                        - Severity: %s
 
-                ROOT CAUSE:
-                [Explain the likely root cause based on the context]
-
-                RESOLUTION STEPS:
-                1. [Step 1]
-                2. [Step 2]
-                3. [Continue as needed]
-
-                PREVENTION TIPS:
-                - [Tip 1]
-                - [Tip 2]
-                - [Continue as needed]
-
-                Be specific and actionable. Reference relevant runbooks or past incidents when applicable.
-                """,
+                        RESPONSE FORMAT:
+                        You must return a strictly valid JSON object. Do not include markdown code blocks (like ```json).
+                        The JSON must have the following structure:
+                        {
+                            "rootCause": "Detailed explanation of the likely root cause...",
+                            "resolutionSteps": [
+                                "Step 1...",
+                                "Step 2..."
+                            ],
+                            "preventionTips": [
+                                "Tip 1...",
+                                "Tip 2..."
+                            ]
+                        }
+                        """,
                 context,
                 request.getIncidentId(),
                 request.getTitle(),
@@ -126,72 +127,71 @@ public class RagService {
 
     private ResolutionResponse parseResponse(String incidentId, String rawResponse,
             List<KnowledgeDocument> relevantDocs) {
-        // Parse root cause
-        String rootCause = extractSection(rawResponse, "ROOT CAUSE:", "RESOLUTION STEPS:");
 
-        // Parse resolution steps
-        List<String> resolutionSteps = extractNumberedList(rawResponse, "RESOLUTION STEPS:", "PREVENTION TIPS:");
-
-        // Parse prevention tips
-        List<String> preventionTips = extractBulletList(rawResponse, "PREVENTION TIPS:");
-
-        // Build source document list
-        List<ResolutionResponse.SourceDocument> sourceDocs = relevantDocs.stream()
-                .map(doc -> ResolutionResponse.SourceDocument.builder()
-                        .id(doc.getId())
-                        .title(doc.getTitle())
-                        .type(doc.getDocType().name())
-                        .similarity(0.0) // Would need to compute from DB
-                        .build())
-                .toList();
-
-        // Calculate confidence based on relevant docs found
-        double confidence = relevantDocs.isEmpty() ? 0.3 : Math.min(0.95, 0.5 + (relevantDocs.size() * 0.1));
-
-        return ResolutionResponse.builder()
-                .incidentId(incidentId)
-                .rootCause(rootCause.trim())
-                .resolutionSteps(resolutionSteps)
-                .preventionTips(preventionTips)
-                .relevantDocuments(sourceDocs)
-                .confidence(confidence)
-                .rawExplanation(rawResponse)
-                .build();
-    }
-
-    private String extractSection(String text, String startMarker, String endMarker) {
-        int start = text.indexOf(startMarker);
-        int end = text.indexOf(endMarker);
-        if (start == -1)
-            return "Unable to determine root cause.";
-        start += startMarker.length();
-        if (end == -1)
-            end = text.length();
-        return text.substring(start, end).trim();
-    }
-
-    private List<String> extractNumberedList(String text, String startMarker, String endMarker) {
-        String section = extractSection(text, startMarker, endMarker);
-        List<String> items = new ArrayList<>();
-        Pattern pattern = Pattern.compile("\\d+\\.\\s*(.+?)(?=\\d+\\.|$)", Pattern.DOTALL);
-        Matcher matcher = pattern.matcher(section);
-        while (matcher.find()) {
-            items.add(matcher.group(1).trim());
+        // Clean up response if it contains markdown code blocks
+        String jsonStr = rawResponse.trim();
+        if (jsonStr.startsWith("```json")) {
+            jsonStr = jsonStr.substring(7);
         }
-        return items.isEmpty() ? List.of("Follow standard incident response procedures.") : items;
-    }
-
-    private List<String> extractBulletList(String text, String startMarker) {
-        int start = text.indexOf(startMarker);
-        if (start == -1)
-            return List.of("Implement monitoring and alerting.");
-        String section = text.substring(start + startMarker.length());
-        List<String> items = new ArrayList<>();
-        Pattern pattern = Pattern.compile("-\\s*(.+?)(?=-|$)", Pattern.DOTALL);
-        Matcher matcher = pattern.matcher(section);
-        while (matcher.find()) {
-            items.add(matcher.group(1).trim());
+        if (jsonStr.startsWith("```")) {
+            jsonStr = jsonStr.substring(3);
         }
-        return items.isEmpty() ? List.of("Implement monitoring and alerting.") : items;
+        if (jsonStr.endsWith("```")) {
+            jsonStr = jsonStr.substring(0, jsonStr.length() - 3);
+        }
+
+        try {
+            com.google.gson.Gson gson = new com.google.gson.Gson();
+            com.google.gson.JsonObject json = gson.fromJson(jsonStr, com.google.gson.JsonObject.class);
+
+            String rootCause = json.has("rootCause") ? json.get("rootCause").getAsString()
+                    : "Unable to determine root cause.";
+
+            List<String> resolutionSteps = new ArrayList<>();
+            if (json.has("resolutionSteps")) {
+                json.getAsJsonArray("resolutionSteps").forEach(e -> resolutionSteps.add(e.getAsString()));
+            }
+
+            List<String> preventionTips = new ArrayList<>();
+            if (json.has("preventionTips")) {
+                json.getAsJsonArray("preventionTips").forEach(e -> preventionTips.add(e.getAsString()));
+            }
+
+            // Build source document list
+            List<ResolutionResponse.SourceDocument> sourceDocs = relevantDocs.stream()
+                    .map(doc -> ResolutionResponse.SourceDocument.builder()
+                            .id(doc.getId())
+                            .title(doc.getTitle())
+                            .type(doc.getDocType().name())
+                            .similarity(0.0)
+                            .build())
+                    .toList();
+
+            // Calculate confidence
+            double confidence = relevantDocs.isEmpty() ? 0.3 : Math.min(0.95, 0.5 + (relevantDocs.size() * 0.1));
+
+            return ResolutionResponse.builder()
+                    .incidentId(incidentId)
+                    .rootCause(rootCause)
+                    .resolutionSteps(resolutionSteps)
+                    .preventionTips(preventionTips)
+                    .relevantDocuments(sourceDocs)
+                    .confidence(confidence)
+                    .rawExplanation(rawResponse)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Failed to parse AI response as JSON. Fallback to raw text.", e);
+            // Fallback: return raw response in root cause and generic steps
+            return ResolutionResponse.builder()
+                    .incidentId(incidentId)
+                    .rootCause("AI Output (Parsing Failed): " + rawResponse)
+                    .resolutionSteps(List.of("Review the detailed AI output in the root cause section."))
+                    .preventionTips(List.of("See above."))
+                    .relevantDocuments(List.of())
+                    .confidence(0.5)
+                    .rawExplanation(rawResponse)
+                    .build();
+        }
     }
 }

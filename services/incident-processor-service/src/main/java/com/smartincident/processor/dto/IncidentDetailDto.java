@@ -32,6 +32,7 @@ public class IncidentDetailDto {
     private String reporterEmail;
     private String assignedTo;
     private String aiRecommendation;
+    private String logs;
     private Double classificationConfidence;
     private String suggestedCategory;
     private Map<String, Object> metadata;
@@ -56,6 +57,7 @@ public class IncidentDetailDto {
                 .reporterEmail(incident.getReporterEmail())
                 .assignedTo(incident.getAssignedTo())
                 .aiRecommendation(incident.getAiRecommendation())
+                .logs(incident.getLogs())
                 .classificationConfidence(incident.getClassificationConfidence())
                 .suggestedCategory(incident.getSuggestedCategory())
                 .metadata(incident.getMetadata())

@@ -56,6 +56,15 @@ public class IncidentProcessingService {
             Category category = parseCategory(payload.getCategory());
             Severity originalSeverity = parseSeverity(payload.getSeverity());
 
+            // Build processing logs
+            StringBuilder logBuilder = new StringBuilder();
+            logBuilder.append(String.format("[%s] Incident %s received from %s%n",
+                    Instant.now(), incidentId, payload.getSource()));
+            logBuilder.append(String.format("[%s] Category parsed: %s%n",
+                    Instant.now(), category));
+            logBuilder.append(String.format("[%s] Original severity: %s%n",
+                    Instant.now(), originalSeverity));
+
             // Classify severity
             ClassificationService.ClassificationResult classification = classificationService.classify(
                     payload.getTitle(),
@@ -63,6 +72,14 @@ public class IncidentProcessingService {
                     category,
                     originalSeverity,
                     payload.getMetadata());
+
+            logBuilder.append(String.format("[%s] Classification complete — severity: %s (confidence: %.2f)%n",
+                    Instant.now(), classification.severity(), classification.confidence()));
+            if (classification.severity() != originalSeverity) {
+                logBuilder.append(String.format("[%s] ESCALATION: %s → %s%n",
+                        Instant.now(), originalSeverity, classification.severity()));
+            }
+            logBuilder.append(String.format("[%s] Incident persisted with status PROCESSING%n", Instant.now()));
 
             // Build and save entity
             Incident incident = Incident.builder()
@@ -77,6 +94,7 @@ public class IncidentProcessingService {
                     .reporterEmail(payload.getReporterEmail())
                     .classificationConfidence(classification.confidence())
                     .suggestedCategory(classification.suggestedCategory())
+                    .logs(logBuilder.toString())
                     .metadata(payload.getMetadata())
                     .createdAt(payload.getCreatedAt())
                     .processedAt(Instant.now())
