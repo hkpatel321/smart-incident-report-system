@@ -147,6 +147,23 @@ export const incidentApi = {
     const response = await api.patch(`/api/dashboard/incidents/${id}/resolve`, body)
     return response.data
   },
+
+  /**
+   * Update an existing incident
+   * Endpoint: PUT /api/dashboard/incidents/:id
+   */
+  async updateIncident(id, data) {
+    const response = await api.put(`/api/dashboard/incidents/${id}`, data);
+    return response.data;
+  },
+
+  /**
+   * Delete an incident
+   * Endpoint: DELETE /api/dashboard/incidents/:id
+   */
+  async deleteIncident(id) {
+    await api.delete(`/api/dashboard/incidents/${id}`);
+  }
 }
 
 export default api

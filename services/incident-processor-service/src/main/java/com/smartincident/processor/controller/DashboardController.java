@@ -233,4 +233,52 @@ public class DashboardController {
                                 })
                                 .orElse(ResponseEntity.notFound().build());
         }
+
+        /**
+         * Update incident details.
+         */
+        @PutMapping("/{id}")
+        public ResponseEntity<IncidentDetailDto> updateIncident(
+                        @PathVariable String id,
+                        @RequestBody com.smartincident.processor.dto.IncidentUpdateRequest request) {
+
+                return incidentRepository.findById(id)
+                                .map(incident -> {
+                                        if (request.getTitle() != null)
+                                                incident.setTitle(request.getTitle());
+                                        if (request.getDescription() != null)
+                                                incident.setDescription(request.getDescription());
+                                        if (request.getCategory() != null)
+                                                incident.setCategory(request.getCategory());
+                                        if (request.getSeverity() != null)
+                                                incident.setClassifiedSeverity(request.getSeverity());
+                                        if (request.getStatus() != null) {
+                                                incident.setStatus(request.getStatus());
+                                                if (request.getStatus() == Status.RESOLVED
+                                                                && incident.getResolvedAt() == null) {
+                                                        incident.setResolvedAt(Instant.now());
+                                                }
+                                        }
+                                        if (request.getAssignedTo() != null)
+                                                incident.setAssignedTo(request.getAssignedTo());
+
+                                        incidentRepository.save(incident);
+                                        log.info("Incident {} updated via dashboard", id);
+                                        return ResponseEntity.ok(IncidentDetailDto.fromEntity(incident));
+                                })
+                                .orElse(ResponseEntity.notFound().build());
+        }
+
+        /**
+         * Delete incident.
+         */
+        @DeleteMapping("/{id}")
+        public ResponseEntity<Void> deleteIncident(@PathVariable String id) {
+                if (!incidentRepository.existsById(id)) {
+                        return ResponseEntity.notFound().build();
+                }
+                incidentRepository.deleteById(id);
+                log.info("Incident {} deleted via dashboard", id);
+                return ResponseEntity.noContent().build();
+        }
 }

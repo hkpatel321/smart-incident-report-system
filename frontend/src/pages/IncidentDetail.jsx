@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Clock, AlertCircle, CheckCircle, CheckCircle2, Sparkles, Loader2 } from 'lucide-react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Clock, AlertCircle, CheckCircle, CheckCircle2, Sparkles, Loader2, Trash2, Edit } from 'lucide-react'
 import { format } from 'date-fns'
 import { incidentApi } from '../services/api'
 import { SeverityBadge, StatusBadge } from '../components/Badge'
+import EditIncidentModal from '../components/EditIncidentModal'
 
 /**
  * Incident Detail Page
@@ -14,9 +15,11 @@ import { SeverityBadge, StatusBadge } from '../components/Badge'
  * - Severity & status highlighted
  * - AI-generated resolution suggestion
  * - Incident timeline
+ * - Edit/Delete Management
  */
 function IncidentDetail() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [incident, setIncident] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -25,6 +28,10 @@ function IncidentDetail() {
   const [aiSuggestion, setAiSuggestion] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [resolving, setResolving] = useState(false)
+
+  // Edit/Delete state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     fetchIncident()
@@ -35,8 +42,14 @@ function IncidentDetail() {
     try {
       const data = await incidentApi.getIncidentById(id)
       setIncident(data)
-      if (data.aiSuggestion) {
-        setAiSuggestion(data.aiSuggestion)
+      if (data.aiRecommendation) {
+          // Parse if it's a string from older incidents
+          try {
+              setAiSuggestion(typeof data.aiRecommendation === 'string' ? JSON.parse(data.aiRecommendation) : data.aiRecommendation)
+          } catch (e) {
+              // Fallback for plain text
+              setAiSuggestion({ rootCause: data.aiRecommendation })
+          }
       }
     } catch (err) {
       setError('Failed to load incident details')
@@ -63,7 +76,7 @@ function IncidentDetail() {
     if (!incident) return
     setResolving(true)
     try {
-      const aiRec = aiSuggestion ? aiSuggestion.rootCause : null
+      const aiRec = aiSuggestion ? JSON.stringify(aiSuggestion) : null
       await incidentApi.resolveIncident(incident.id, aiRec)
       await fetchIncident() // Refresh to show updated status + timeline
     } catch (err) {
@@ -71,6 +84,25 @@ function IncidentDetail() {
     } finally {
       setResolving(false)
     }
+  }
+  
+  const handleDelete = async () => {
+      if (!window.confirm('Are you sure you want to delete this incident? This action cannot be undone.')) {
+          return
+      }
+      setDeleting(true)
+      try {
+          await incidentApi.deleteIncident(incident.id)
+          navigate('/')
+      } catch (err) {
+          console.error('Failed to delete incident:', err)
+          alert('Failed to delete incident')
+          setDeleting(false)
+      }
+  }
+
+  const handleIncidentUpdated = (updatedIncident) => {
+      setIncident(updatedIncident)
   }
 
   if (loading) {
@@ -111,16 +143,36 @@ function IncidentDetail() {
           <div>
             <p className="text-sm font-mono text-blue-600 mb-1">{incident.id}</p>
             <h1 className="text-2xl font-bold text-gray-900">{incident.title}</h1>
-            <p className="text-gray-500 mt-1">{incident.serviceName}</p>
+            <p className="text-gray-500 mt-1">{incident.serviceName || incident.source}</p>
           </div>
           <div className="flex items-center gap-3">
-            <SeverityBadge severity={incident.severity} />
+            <SeverityBadge severity={incident.severity || incident.classifiedSeverity} />
             <StatusBadge status={incident.status} />
+            
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-200">
+                <button
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Edit Incident"
+                >
+                    <Edit className="w-5 h-5" />
+                </button>
+                <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                    title="Delete Incident"
+                >
+                    {deleting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
+                </button>
+            </div>
+
             {incident.status !== 'RESOLVED' && (
               <button
                 onClick={handleResolve}
                 disabled={resolving}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm"
+                className="ml-2 flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
               >
                 {resolving ? (
                   <>
@@ -130,7 +182,7 @@ function IncidentDetail() {
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    Resolve Incident
+                    Resolve
                   </>
                 )}
               </button>
@@ -144,18 +196,19 @@ function IncidentDetail() {
         <div className="mt-6 pt-4 border-t border-gray-100 flex gap-6 text-sm text-gray-500">
           <span>Source: <strong>{incident.source}</strong></span>
           <span>Category: <strong>{incident.category}</strong></span>
-          <span>Reporter: <strong>{incident.reporterEmail}</strong></span>
+          <span>Reporter: <strong>{incident.reporterEmail || 'N/A'}</strong></span>
+          <span>Assigned: <strong>{incident.assignedTo || 'Unassigned'}</strong></span>
         </div>
       </div>
 
       {/* Two Column Layout */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
-        <div className="col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           {/* Log Snippet */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Log Output</h2>
-            <pre className="bg-gray-900 text-green-400 p-4 rounded-lg text-sm font-mono overflow-x-auto max-h-64">
+            <pre className="bg-gray-900 text-green-400 p-4 rounded-lg text-sm font-mono overflow-x-auto max-h-64 whitespace-pre-wrap">
               {incident.logs || 'No logs available'}
             </pre>
           </div>
@@ -196,10 +249,10 @@ function IncidentDetail() {
                   <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-xs">
                     <div
                       className="bg-purple-500 h-2 rounded-full"
-                      style={{ width: `${aiSuggestion.confidence * 100}%` }}
+                      style={{ width: `${(aiSuggestion.confidence || 0) * 100}%` }}
                     />
                   </div>
-                  <span className="font-medium">{Math.round(aiSuggestion.confidence * 100)}%</span>
+                  <span className="font-medium">{Math.round((aiSuggestion.confidence || 0) * 100)}%</span>
                 </div>
 
                 {/* Root Cause */}
@@ -214,7 +267,7 @@ function IncidentDetail() {
                 <div>
                   <h3 className="font-medium text-gray-900 mb-2">Resolution Steps</h3>
                   <ol className="list-decimal list-inside space-y-2">
-                    {(aiSuggestion.steps || aiSuggestion.resolutionSteps || []).map((step, i) => (
+                    {(aiSuggestion.resolutionSteps || []).map((step, i) => (
                       <li key={i} className="text-gray-700 bg-gray-50 p-2 rounded">
                         {step}
                       </li>
@@ -250,6 +303,13 @@ function IncidentDetail() {
                 active={!!incident.processedAt}
               />
               <TimelineItem
+                icon={Edit}
+                label="Last Updated"
+                time={incident.updatedAt}
+                color="text-orange-500"
+                active={incident.updatedAt && incident.updatedAt !== incident.createdAt}
+              />
+              <TimelineItem
                 icon={CheckCircle}
                 label="Resolved"
                 time={incident.resolvedAt}
@@ -260,6 +320,14 @@ function IncidentDetail() {
           </div>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      <EditIncidentModal
+        incident={incident}
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onIncidentUpdated={handleIncidentUpdated}
+      />
     </div>
   )
 }
