@@ -128,16 +128,15 @@ public class RagService {
     private ResolutionResponse parseResponse(String incidentId, String rawResponse,
             List<KnowledgeDocument> relevantDocs) {
 
-        // Clean up response if it contains markdown code blocks
+        // Robustly extract JSON from the response.
+        // Gemini may wrap it in ```json ... ``` or return it with leading/trailing
+        // whitespace/newlines.
         String jsonStr = rawResponse.trim();
-        if (jsonStr.startsWith("```json")) {
-            jsonStr = jsonStr.substring(7);
-        }
-        if (jsonStr.startsWith("```")) {
-            jsonStr = jsonStr.substring(3);
-        }
-        if (jsonStr.endsWith("```")) {
-            jsonStr = jsonStr.substring(0, jsonStr.length() - 3);
+
+        // Try to extract a JSON object using regex (handles any code fence variant)
+        Matcher jsonMatcher = Pattern.compile("(?s)\\{.*\\}").matcher(jsonStr);
+        if (jsonMatcher.find()) {
+            jsonStr = jsonMatcher.group().trim();
         }
 
         try {
