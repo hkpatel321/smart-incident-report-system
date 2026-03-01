@@ -192,6 +192,50 @@ services:
       retries: 3
       start_period: 60s
 
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    hostname: notification-service
+    ports:
+      - "8083:8083"
+    environment:
+      # Kafka
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_CONSUMER_GROUP_ID: notification-service-group
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/incident_db
+      SPRING_DATASOURCE_USERNAME: incident_user
+      SPRING_DATASOURCE_PASSWORD: incident_pass
+      SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: notification
+      # Mail (set MAIL_ENABLED=true and supply credentials to activate real sending)
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      MAIL_HOST: ${MAIL_HOST:-smtp.mailtrap.io}
+      MAIL_PORT: ${MAIL_PORT:-2525}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-noreply@smartincident.local}
+      ONCALL_EMAIL: ${ONCALL_EMAIL:-oncall@smartincident.local}
+      # Server
+      SERVER_PORT: 8083
+      # Logging
+      LOGGING_LEVEL_COM_SMARTINCIDENT: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - incident-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/api/notifications/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
   # ===========================================
   # FRONTEND
   # ===========================================
@@ -208,6 +252,7 @@ services:
       - incident-ingest-service
       - incident-processor-service
       - ai-rag-service
+      - notification-service
     networks:
       - incident-network
     restart: unless-stopped
