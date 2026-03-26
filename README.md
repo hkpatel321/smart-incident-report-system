@@ -29,13 +29,14 @@ A cloud-native, event-driven incident management platform with AI-powered resolu
 ```
 SmartIncidenceReportSystem/
 ├── docker-compose.yml              # Full stack deployment
-├── Dockerfile                      # Ingest service
 ├── infrastructure/
 │   └── postgres/
 │       ├── init.sql                # Schema setup
 │       └── pgvector-setup.sql      # Vector extension
 ├── services/
+│   ├── incident-ingest-service/    # Incident ingestion API
 │   ├── incident-processor-service/ # Kafka consumer + DB
+│   ├── notification-service/       # Notification workflow
 │   └── ai-rag-service/             # Gemini AI + RAG
 ├── frontend/                       # React dashboard
 │   ├── Dockerfile

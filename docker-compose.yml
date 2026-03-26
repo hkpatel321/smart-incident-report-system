@@ -92,7 +92,7 @@ services:
 
   incident-ingest-service:
     build:
-      context: .
+      context: ./services/incident-ingest-service
       dockerfile: Dockerfile
     container_name: incident-ingest-service
     hostname: incident-ingest-service

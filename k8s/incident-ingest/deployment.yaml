@@ -30,7 +30,7 @@ spec:
       containers:
         - name: incident-ingest-service
           # For Minikube: use local image
-          # Run: eval $(minikube docker-env) && docker build -t incident-ingest-service:latest .
+          # Run: docker build -t incident-ingest-service:latest ./services/incident-ingest-service
           image: incident-ingest-service:latest
           imagePullPolicy: IfNotPresent
           ports:
