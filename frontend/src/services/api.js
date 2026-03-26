@@ -27,6 +27,16 @@ const api = axios.create({
   timeout: 10000,
 })
 
+function normalizeIncident(incident) {
+  if (!incident) return incident
+
+  return {
+    ...incident,
+    severity: incident.severity || incident.classifiedSeverity || incident.originalSeverity || '',
+    serviceName: incident.serviceName || incident.source || '',
+  }
+}
+
 // Attach JWT token to every request
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('authToken')
@@ -58,7 +68,7 @@ export const incidentApi = {
   async getIncidents(filters = {}) {
     if (USE_MOCK_DATA) {
       await new Promise(resolve => setTimeout(resolve, 300))
-      let filtered = [...mockIncidents]
+      let filtered = mockIncidents.map(normalizeIncident)
       if (filters.severity) filtered = filtered.filter(i => i.severity === filters.severity)
       if (filters.status) filtered = filtered.filter(i => i.status === filters.status)
       if (filters.search) {
@@ -78,7 +88,10 @@ export const incidentApi = {
     if (filters.size) params.append('size', filters.size)
 
     const response = await api.get(`/api/dashboard/incidents?${params}`)
-    return response.data
+    return {
+      ...response.data,
+      content: (response.data.content || []).map(normalizeIncident),
+    }
   },
 
   /**
@@ -88,13 +101,13 @@ export const incidentApi = {
   async getIncidentById(id) {
     if (USE_MOCK_DATA) {
       await new Promise(resolve => setTimeout(resolve, 200))
-      const incident = mockIncidents.find(i => i.id === id)
+      const incident = mockIncidents.map(normalizeIncident).find(i => i.id === id)
       if (!incident) throw new Error('Incident not found')
       return incident
     }
 
     const response = await api.get(`/api/dashboard/incidents/${id}`)
-    return response.data
+    return normalizeIncident(response.data)
   },
 
   /**
@@ -154,7 +167,7 @@ export const incidentApi = {
   async resolveIncident(id, aiRecommendation = null) {
     const body = aiRecommendation ? { aiRecommendation } : {}
     const response = await api.patch(`/api/dashboard/incidents/${id}/resolve`, body)
-    return response.data
+    return normalizeIncident(response.data)
   },
 
   /**
@@ -163,7 +176,7 @@ export const incidentApi = {
    */
   async updateIncident(id, data) {
     const response = await api.put(`/api/dashboard/incidents/${id}`, data);
-    return response.data;
+    return normalizeIncident(response.data);
   },
 
   /**
@@ -180,7 +193,7 @@ export const incidentApi = {
    */
   async assignIncident(id, assignedTo) {
     const response = await api.patch(`/api/dashboard/incidents/${id}/assign`, { assignedTo })
-    return response.data
+    return normalizeIncident(response.data)
   }
 }
 

@@ -64,6 +64,11 @@ function Dashboard() {
     setFilters({ severity: '', status: '', search: '' })
   }
 
+  const getIncidentSeverity = incident =>
+    incident.severity || incident.classifiedSeverity || incident.originalSeverity || ''
+
+  const criticalCount = incidents.filter(i => getIncidentSeverity(i) === 'CRITICAL').length
+
   return (
     <div className="p-8">
       {/* Header */}
@@ -81,7 +86,7 @@ function Dashboard() {
         />
         <StatCard 
           label="Critical" 
-          value={incidents.filter(i => i.severity === 'CRITICAL').length} 
+          value={criticalCount} 
           color="bg-red-500" 
         />
         <StatCard 
@@ -227,7 +232,7 @@ function Dashboard() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <SeverityBadge severity={incident.severity} />
+                    <SeverityBadge severity={getIncidentSeverity(incident)} />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge status={incident.status} />

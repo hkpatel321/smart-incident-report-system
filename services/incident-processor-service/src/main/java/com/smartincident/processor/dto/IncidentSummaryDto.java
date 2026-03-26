@@ -23,7 +23,9 @@ public class IncidentSummaryDto {
     private String id;
     private String title;
     private String source;
+    private String serviceName;
     private Category category;
+    private Severity severity;
     private Severity originalSeverity;
     private Severity classifiedSeverity;
     private Status status;
@@ -40,7 +42,9 @@ public class IncidentSummaryDto {
                 .id(incident.getId())
                 .title(incident.getTitle())
                 .source(incident.getSource())
+                .serviceName(incident.getSource())
                 .category(incident.getCategory())
+                .severity(incident.getClassifiedSeverity())
                 .originalSeverity(incident.getOriginalSeverity())
                 .classifiedSeverity(incident.getClassifiedSeverity())
                 .status(incident.getStatus())
