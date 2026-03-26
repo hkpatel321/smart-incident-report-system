@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Clock, AlertCircle, CheckCircle, CheckCircle2, Sparkles, Loader2, Trash2, Edit } from 'lucide-react'
+import { ArrowLeft, Clock, AlertCircle, CheckCircle, CheckCircle2, Sparkles, Loader2, Trash2, Edit, UserCheck } from 'lucide-react'
 import { format } from 'date-fns'
 import { incidentApi } from '../services/api'
 import { SeverityBadge, StatusBadge } from '../components/Badge'
 import EditIncidentModal from '../components/EditIncidentModal'
+import { useAuth } from '../context/AuthContext'
 
 /**
  * Incident Detail Page
@@ -20,6 +21,7 @@ import EditIncidentModal from '../components/EditIncidentModal'
 function IncidentDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user, isAdmin } = useAuth()
   const [incident, setIncident] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -32,6 +34,10 @@ function IncidentDetail() {
   // Edit/Delete state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // Assign state (admin only)
+  const [assignEmail, setAssignEmail] = useState('')
+  const [assigning, setAssigning] = useState(false)
 
   useEffect(() => {
     fetchIncident()
@@ -105,6 +111,24 @@ function IncidentDetail() {
       setIncident(updatedIncident)
   }
 
+  const handleAssign = async () => {
+    if (!assignEmail.trim()) return
+    setAssigning(true)
+    try {
+      const updated = await incidentApi.assignIncident(incident.id, assignEmail.trim())
+      setIncident(updated)
+      setAssignEmail('')
+    } catch (err) {
+      console.error('Failed to assign incident:', err)
+      alert('Failed to assign incident — ' + (err.response?.data?.error || err.message))
+    } finally {
+      setAssigning(false)
+    }
+  }
+
+  // Ownership: ADMIN can edit/delete any; DEVELOPER only their own
+  const canEditOrDelete = isAdmin() || incident?.reporterEmail === user?.email
+
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-screen">
@@ -149,41 +173,40 @@ function IncidentDetail() {
             <SeverityBadge severity={incident.severity || incident.classifiedSeverity} />
             <StatusBadge status={incident.status} />
             
-            {/* Action Buttons */}
+            {/* Action Buttons — conditional on role/ownership */}
             <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-200">
-                <button
-                    onClick={() => setIsEditModalOpen(true)}
-                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Edit Incident"
-                >
-                    <Edit className="w-5 h-5" />
-                </button>
-                <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                    title="Delete Incident"
-                >
-                    {deleting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
-                </button>
+                {canEditOrDelete && (
+                  <>
+                    <button
+                        onClick={() => setIsEditModalOpen(true)}
+                        className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit Incident"
+                    >
+                        <Edit className="w-5 h-5" />
+                    </button>
+                    <button
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        title="Delete Incident"
+                    >
+                        {deleting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
+                    </button>
+                  </>
+                )}
             </div>
 
-            {incident.status !== 'RESOLVED' && (
+            {/* Resolve — ADMIN only */}
+            {isAdmin() && incident.status !== 'RESOLVED' && (
               <button
                 onClick={handleResolve}
                 disabled={resolving}
                 className="ml-2 flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
               >
                 {resolving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Resolving...
-                  </>
+                  <><Loader2 className="w-4 h-4 animate-spin" />Resolving...</>
                 ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    Resolve
-                  </>
+                  <><CheckCircle2 className="w-4 h-4" />Resolve</>
                 )}
               </button>
             )}
@@ -199,6 +222,30 @@ function IncidentDetail() {
           <span>Reporter: <strong>{incident.reporterEmail || 'N/A'}</strong></span>
           <span>Assigned: <strong>{incident.assignedTo || 'Unassigned'}</strong></span>
         </div>
+
+        {/* Assign panel — ADMIN only */}
+        {isAdmin() && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="text-sm font-medium text-gray-700 mb-2">Assign to (email):</p>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={assignEmail}
+                onChange={e => setAssignEmail(e.target.value)}
+                placeholder={incident.assignedTo || 'developer@example.com'}
+                className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={handleAssign}
+                disabled={assigning || !assignEmail.trim()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {assigning ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                Assign
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Two Column Layout */}

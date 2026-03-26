@@ -13,7 +13,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -176,9 +179,10 @@ public class DashboardController {
         }
 
         /**
-         * Resolve an incident — sets status to RESOLVED and records resolvedAt.
+         * Resolve an incident — ADMIN only.
          */
         @PatchMapping("/{id}/resolve")
+        @PreAuthorize("hasRole('ADMIN')")
         public ResponseEntity<IncidentDetailDto> resolveIncident(
                         @PathVariable String id,
                         @RequestBody(required = false) Map<String, String> body) {
@@ -190,12 +194,39 @@ public class DashboardController {
                                         if (body != null && body.containsKey("aiRecommendation")) {
                                                 incident.setAiRecommendation(body.get("aiRecommendation"));
                                         }
-                                        // Append resolve log
                                         String existingLogs = incident.getLogs() != null ? incident.getLogs() : "";
                                         incident.setLogs(existingLogs +
                                                         String.format("[%s] Incident resolved%n", Instant.now()));
                                         incidentRepository.save(incident);
                                         log.info("Incident {} resolved", id);
+                                        return ResponseEntity.ok(IncidentDetailDto.fromEntity(incident));
+                                })
+                                .orElse(ResponseEntity.notFound().build());
+        }
+
+        /**
+         * Assign incident to a user — ADMIN only.
+         */
+        @PatchMapping("/{id}/assign")
+        @PreAuthorize("hasRole('ADMIN')")
+        public ResponseEntity<IncidentDetailDto> assignIncident(
+                        @PathVariable String id,
+                        @RequestBody Map<String, String> body) {
+
+                String assignee = body.get("assignedTo");
+                if (assignee == null || assignee.isBlank()) {
+                        return ResponseEntity.badRequest().build();
+                }
+
+                return incidentRepository.findById(id)
+                                .map(incident -> {
+                                        incident.setAssignedTo(assignee);
+                                        String existingLogs = incident.getLogs() != null ? incident.getLogs() : "";
+                                        incident.setLogs(existingLogs +
+                                                        String.format("[%s] Assigned to %s%n", Instant.now(),
+                                                                        assignee));
+                                        incidentRepository.save(incident);
+                                        log.info("Incident {} assigned to {}", id, assignee);
                                         return ResponseEntity.ok(IncidentDetailDto.fromEntity(incident));
                                 })
                                 .orElse(ResponseEntity.notFound().build());
@@ -235,15 +266,21 @@ public class DashboardController {
         }
 
         /**
-         * Update incident details.
+         * Update incident — ADMIN can update any; DEVELOPER only their own.
          */
         @PutMapping("/{id}")
         public ResponseEntity<IncidentDetailDto> updateIncident(
                         @PathVariable String id,
-                        @RequestBody com.smartincident.processor.dto.IncidentUpdateRequest request) {
+                        @RequestBody com.smartincident.processor.dto.IncidentUpdateRequest request,
+                        Authentication auth) {
 
                 return incidentRepository.findById(id)
                                 .map(incident -> {
+                                        // Ownership check for DEVELOPER
+                                        if (!isAdminOrOwner(auth, incident)) {
+                                                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                                                .<IncidentDetailDto>build();
+                                        }
                                         if (request.getTitle() != null)
                                                 incident.setTitle(request.getTitle());
                                         if (request.getDescription() != null)
@@ -263,22 +300,43 @@ public class DashboardController {
                                                 incident.setAssignedTo(request.getAssignedTo());
 
                                         incidentRepository.save(incident);
-                                        log.info("Incident {} updated via dashboard", id);
+                                        log.info("Incident {} updated by {}", id, auth.getPrincipal());
                                         return ResponseEntity.ok(IncidentDetailDto.fromEntity(incident));
                                 })
                                 .orElse(ResponseEntity.notFound().build());
         }
 
         /**
-         * Delete incident.
+         * Delete incident — ADMIN can delete any; DEVELOPER only their own.
          */
         @DeleteMapping("/{id}")
-        public ResponseEntity<Void> deleteIncident(@PathVariable String id) {
-                if (!incidentRepository.existsById(id)) {
+        public ResponseEntity<Void> deleteIncident(@PathVariable String id, Authentication auth) {
+                var incidentOpt = incidentRepository.findById(id);
+                if (incidentOpt.isEmpty()) {
                         return ResponseEntity.notFound().build();
                 }
+                Incident incident = incidentOpt.get();
+                if (!isAdminOrOwner(auth, incident)) {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                }
                 incidentRepository.deleteById(id);
-                log.info("Incident {} deleted via dashboard", id);
+                log.info("Incident {} deleted by {}", id, auth.getPrincipal());
                 return ResponseEntity.noContent().build();
+        }
+
+        // ─── Helpers ────────────────────────────────────────────────────────────
+
+        /**
+         * Returns true if the caller is an ADMIN, or is the reporter of the incident.
+         */
+        private boolean isAdminOrOwner(Authentication auth, Incident incident) {
+                if (auth == null)
+                        return false;
+                boolean isAdmin = auth.getAuthorities().stream()
+                                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+                if (isAdmin)
+                        return true;
+                String callerEmail = (String) auth.getPrincipal();
+                return callerEmail != null && callerEmail.equalsIgnoreCase(incident.getReporterEmail());
         }
 }

@@ -27,6 +27,15 @@ const api = axios.create({
   timeout: 10000,
 })
 
+// Attach JWT token to every request
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('authToken')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
 // Response interceptor for error handling
 api.interceptors.response.use(
   response => response,
@@ -163,6 +172,33 @@ export const incidentApi = {
    */
   async deleteIncident(id) {
     await api.delete(`/api/dashboard/incidents/${id}`);
+  },
+
+  /**
+   * Assign an incident to a user (Admin only)
+   * Endpoint: PATCH /api/dashboard/incidents/:id/assign
+   */
+  async assignIncident(id, assignedTo) {
+    const response = await api.patch(`/api/dashboard/incidents/${id}/assign`, { assignedTo })
+    return response.data
+  }
+}
+
+/**
+ * Auth API — login, register, me
+ */
+export const authApi = {
+  async login(email, password) {
+    const response = await api.post('/api/auth/login', { email, password })
+    return response.data
+  },
+  async register(name, email, password, role) {
+    const response = await api.post('/api/auth/register', { name, email, password, role })
+    return response.data
+  },
+  async me() {
+    const response = await api.get('/api/auth/me')
+    return response.data
   }
 }
 

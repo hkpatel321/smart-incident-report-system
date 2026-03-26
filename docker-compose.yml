@@ -137,6 +137,9 @@ services:
       SPRING_DATASOURCE_USERNAME: incident_user
       SPRING_DATASOURCE_PASSWORD: incident_pass
       SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: processor
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-SmartIncidentSuperSecretKey2026ProductionKeyMustBe256BitsMinimumXYZ1}
+      JWT_EXPIRY_MS: ${JWT_EXPIRY_MS:-86400000}
       # Server
       SERVER_PORT: 8082
       # Logging

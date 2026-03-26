@@ -1,17 +1,25 @@
-import { Outlet, Link, useLocation } from 'react-router-dom'
-import { AlertTriangle, LayoutDashboard, Plus } from 'lucide-react'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { AlertTriangle, LayoutDashboard, Plus, LogOut, User } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 /**
  * Main Layout Component
- * Provides navigation sidebar and main content area
+ * Provides navigation sidebar, user info, and logout.
  */
 function Layout() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/create', label: 'Create Incident', icon: Plus },
   ]
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -53,9 +61,33 @@ function Layout() {
           </ul>
         </nav>
 
-        {/* Footer */}
+        {/* User Info + Logout */}
         <div className="p-4 border-t border-gray-700">
-          <p className="text-xs text-gray-500">v1.0.0 • Cloud Computing Demo</p>
+          {user && (
+            <div className="mb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <User className="w-4 h-4 text-gray-400" />
+                <span className="text-sm font-medium text-white truncate">{user.name}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400 truncate">{user.email}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  user.role === 'ADMIN'
+                    ? 'bg-orange-500/20 text-orange-300'
+                    : 'bg-blue-500/20 text-blue-300'
+                }`}>
+                  {user.role}
+                </span>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
         </div>
       </aside>
 
